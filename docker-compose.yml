@@ -1,0 +1,110 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: qflow
+      POSTGRES_USER: qflow
+      POSTGRES_PASSWORD: qflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qflow -d qflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://qflow:qflow@db:5432/qflow
+      REDIS_URL: redis://redis:6379/0
+      DJANGO_SECRET_KEY: dev-secret-key-change-in-production
+      DJANGO_DEBUG: "true"
+      DJANGO_ALLOWED_HOSTS: "*"
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      MAX_UPLOAD_SIZE_MB: "50"
+      MAX_FILES_PER_UPLOAD: "10"
+      MAX_TOTAL_DOCUMENTS: "100"
+      ALLOWED_EXTENSIONS: txt,md,pdf,docx
+      EMBEDDING_MODEL: BAAI/bge-small-en-v1.5
+      CHUNK_SIZE_TOKENS: "512"
+      CHUNK_OVERLAP_TOKENS: "64"
+      SEARCH_DEFAULT_LIMIT: "10"
+      SEARCH_MIN_SCORE: "0.5"
+      SEARCH_CANDIDATE_MULTIPLIER: "3"
+      THROTTLE_UPLOAD_RATE: "10/min"
+      THROTTLE_SEARCH_RATE: "60/min"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    command: ["/app/entrypoint.sh", "web"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 180s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://qflow:qflow@db:5432/qflow
+      REDIS_URL: redis://redis:6379/0
+      DJANGO_SECRET_KEY: dev-secret-key-change-in-production
+      DJANGO_DEBUG: "true"
+      MAX_UPLOAD_SIZE_MB: "50"
+      MAX_FILES_PER_UPLOAD: "10"
+      MAX_TOTAL_DOCUMENTS: "100"
+      ALLOWED_EXTENSIONS: txt,md,pdf,docx
+      EMBEDDING_MODEL: BAAI/bge-small-en-v1.5
+      CHUNK_SIZE_TOKENS: "512"
+      CHUNK_OVERLAP_TOKENS: "64"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    command: ["/app/entrypoint.sh", "worker"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:

@@ -1,0 +1,12 @@
+Django>=5.0,<6.0
+djangorestframework>=3.15,<4.0
+django-cors-headers>=4.3,<5.0
+psycopg2-binary>=2.9,<3.0
+pgvector>=0.3,<1.0
+celery>=5.4,<6.0
+redis>=5.0,<6.0
+sentence-transformers>=3.0,<4.0
+pypdf>=5.0,<6.0
+python-docx>=1.1,<2.0
+filetype>=1.2,<2.0
+gunicorn>=22.0,<24.0
