@@ -1,123 +1,69 @@
 # Document Embedding & Search Service
 
-Small end-to-end semantic search service:
-- upload documents (`.txt`, `.md`, `.pdf`, `.docx`)
-- embed content locally (no external API keys)
-- search by meaning with pgvector
-
-Run with one command:
+Upload documents, embed them locally, search by meaning with pgvector.
 
 ```bash
 docker compose up -d --build
 ```
 
-Frontend: `http://localhost:3000`  
-Backend: `http://localhost:8000`
+- Frontend: http://localhost:3000  
+- Backend: http://localhost:8000  
+- Health: `curl http://localhost:8000/api/health/`
+
+Stop: `docker compose down` · Reset data: `docker compose down -v`
 
 ---
 
-## Quick Start
+## What it does
 
-```bash
-git clone <repo-url>
-cd qflow-assessment
-docker compose up -d --build
-curl http://localhost:8000/api/health/
-```
+1. Upload `.txt`, `.md`, `.pdf`, or `.docx` files (staged upload in the UI).
+2. A Celery worker extracts text, chunks, embeds with `BAAI/bge-small-en-v1.5`, stores vectors in PostgreSQL.
+3. Search by natural-language query; results above a relevance threshold with optional document scope filter.
+4. Open a result to see highlighted text, surrounding chunks, extracted full text, or download the original file.
 
-Stop:
-
-```bash
-docker compose down
-docker compose down -v  # wipe volumes
-```
+No external API keys required.
 
 ---
 
 ## Stack
 
-- Backend: Django + DRF
-- Worker: Celery + Redis
-- Database: PostgreSQL 16 + pgvector (HNSW index)
-- Embeddings: `BAAI/bge-small-en-v1.5` (local via sentence-transformers)
-- Frontend: Next.js 14 + Tailwind
-- Storage: local Docker volume at `/app/uploads` (S3/MinIO recommended for production)
+Django + DRF · Celery + Redis · PostgreSQL 16 + pgvector · Next.js 14 · local sentence-transformers (CPU)
 
 ---
 
-## Core Flow
+## Documentation
 
-1. User uploads one or more files.
-2. API validates and stores files, creates `Document(status=queued)`.
-3. Celery worker extracts text, chunks, embeds, stores vectors, sets `status=ready`.
-4. Search endpoint embeds query and runs cosine similarity search in pgvector.
-5. UI shows top results above configured threshold, with context modal.
+Full design and API details live in [`docs/`](docs/README.md):
+
+- [Architecture](docs/architecture.md) — how the system works and why
+- [Embeddings](docs/embeddings.md) — why the model runs locally
+- [Chunking strategy](docs/chunking-strategy.md) — token size, overlap, format-aware splits
+- [API reference](docs/api.md)
+- [Configuration](docs/configuration.md)
 
 ---
 
-## API (minimal)
-
-Base URL: `http://localhost:8000/api`
-
-- `GET /health/`
-- `POST /documents/` (multipart `files`)
-- `GET /documents/`
-- `GET /documents/{id}/`
-- `GET /documents/{id}/content/` (truncated text view)
-- `DELETE /documents/{id}/`
-- `POST /search/`
-- `GET /documents/{id}/chunks/{chunk_index}/context/` (match ±1 chunk)
-
-Example search:
+## Quick API examples
 
 ```bash
+# Upload
+curl -X POST http://localhost:8000/api/documents/ -F "files=@notes.md"
+
+# Search
 curl -X POST http://localhost:8000/api/search/ \
   -H "Content-Type: application/json" \
-  -d '{"query":"refund policy","limit":10,"document_ids":[1,3]}'
+  -d '{"query":"refund policy","limit":10}'
+
+# Download original
+curl -O -J http://localhost:8000/api/documents/1/download/
 ```
 
-Notes:
-- `min_score` is backend-configured (`SEARCH_MIN_SCORE`), not a request parameter.
-- Response includes `min_score`, `total_above_threshold`, and `results`.
-
 ---
 
-## Config (important env vars)
+## Django admin
 
-- `MAX_UPLOAD_SIZE_MB` (default `50`)
-- `MAX_FILES_PER_UPLOAD` (default `10`)
-- `MAX_TOTAL_DOCUMENTS` (default `100`)
-- `ALLOWED_EXTENSIONS` (default `txt,md,pdf,docx`)
-- `EMBEDDING_MODEL` (default `BAAI/bge-small-en-v1.5`)
-- `CHUNK_SIZE_TOKENS` (default `512`)
-- `CHUNK_OVERLAP_TOKENS` (default `64`)
-- `SEARCH_DEFAULT_LIMIT` (default `10`)
-- `SEARCH_MIN_SCORE` (default `0.5`)
-- `SEARCH_CANDIDATE_MULTIPLIER` (default `3`)
-- `DOCUMENT_CONTENT_MAX_CHARS` (default `120000`)
+```bash
+docker compose exec backend python manage.py createsuperuser
+```
 
-See `docker-compose.yml` for full defaults.
-
----
-
-## UX choices
-
-- Search-first page with staged upload (`Start upload`)
-- Multi-select document scope (empty = all docs)
-- Recent uploads panel (latest 8)
-- Result modal with highlighted passage, surrounding chunks, optional full document text
-- Delete requires confirmation
-
----
-
-## If More Time
-
-- Move file storage to S3/MinIO
-- Add hybrid retrieval (BM25 + vector rerank)
-- Add SSE push updates (replace polling)
-- Add integration tests + CI
-- Add observability and auth
-
----
-
-**Detailed docs:** [README_LONG.md](README_LONG.md) — architecture, design decisions, full API reference, scaling notes.
+http://localhost:8000/admin/

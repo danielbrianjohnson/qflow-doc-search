@@ -12,6 +12,11 @@ urlpatterns = [
         name="document-content",
     ),
     path(
+        "documents/<int:pk>/download/",
+        views.DocumentDownloadView.as_view(),
+        name="document-download",
+    ),
+    path(
         "documents/<int:pk>/chunks/<int:chunk_index>/context/",
         views.DocumentChunkContextView.as_view(),
         name="document-chunk-context",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Document, formatDateTime, formatFileSize } from "@/lib/api";
+import { Document, formatDateTime, formatFileSize, getDocumentDownloadUrl } from "@/lib/api";
 
 interface RecentUploadsProps {
   documents: Document[];
@@ -51,19 +51,28 @@ export default function RecentUploads({ documents, onDelete, loading }: RecentUp
               {doc.status === "failed" && doc.error_message && ` · ${doc.error_message}`}
             </p>
           </div>
-          <button
-            onClick={() => {
-              const ok = window.confirm(
-                `Delete "${doc.filename}"? This removes stored chunks and embeddings too.`
-              );
-              if (ok) {
-                onDelete(doc.id);
-              }
-            }}
-            className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 shrink-0"
-          >
-            Delete
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={getDocumentDownloadUrl(doc.id)}
+              download={doc.filename}
+              className="text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              Download
+            </a>
+            <button
+              onClick={() => {
+                const ok = window.confirm(
+                  `Delete "${doc.filename}"? This removes stored chunks and embeddings too.`
+                );
+                if (ok) {
+                  onDelete(doc.id);
+                }
+              }}
+              className="text-xs text-red-600 hover:text-red-800 dark:text-red-400"
+            >
+              Delete
+            </button>
+          </div>
         </li>
       ))}
     </ul>

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from django.db import connection
+from django.http import FileResponse
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -134,3 +135,29 @@ class DocumentContentView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(payload)
+
+
+class DocumentDownloadView(APIView):
+    def get(self, request, pk: int):
+        document = Document.objects.filter(pk=pk).first()
+        if document is None:
+            return Response(
+                {"error": "Document not found.", "code": "NOT_FOUND"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        file_path = Path(document.file_path)
+        if not file_path.is_file():
+            return Response(
+                {"error": "Original file is no longer available.", "code": "FILE_MISSING"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response = FileResponse(
+            file_path.open("rb"),
+            as_attachment=True,
+            filename=document.filename,
+        )
+        if document.content_type:
+            response["Content-Type"] = document.content_type
+        return response

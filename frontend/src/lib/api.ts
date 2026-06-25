@@ -97,6 +97,10 @@ export async function deleteDocument(id: number): Promise<void> {
   }
 }
 
+export function getDocumentDownloadUrl(id: number): string {
+  return `${API_URL}/api/documents/${id}/download/`;
+}
+
 export async function searchDocuments(
   query: string,
   options?: {
