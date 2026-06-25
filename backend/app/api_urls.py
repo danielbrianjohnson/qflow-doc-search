@@ -7,6 +7,11 @@ urlpatterns = [
     path("documents/", views.DocumentListCreateView.as_view(), name="document-list-create"),
     path("documents/<int:pk>/", views.DocumentDetailView.as_view(), name="document-detail"),
     path(
+        "documents/<int:pk>/content/",
+        views.DocumentContentView.as_view(),
+        name="document-content",
+    ),
+    path(
         "documents/<int:pk>/chunks/<int:chunk_index>/context/",
         views.DocumentChunkContextView.as_view(),
         name="document-chunk-context",

@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from app.models import Document
 from app.serializers import DocumentSerializer, DocumentUploadSerializer, SearchSerializer
 from app.services.chunks import get_chunk_context
+from app.services.documents import get_document_content
 from app.services.embeddings import get_embedding_service
 from app.services.search import search_chunks
 from app.tasks import process_document
@@ -122,3 +123,14 @@ class DocumentChunkContextView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(context)
+
+
+class DocumentContentView(APIView):
+    def get(self, request, pk: int):
+        payload = get_document_content(document_id=pk)
+        if payload is None:
+            return Response(
+                {"error": "Document not found or not ready.", "code": "NOT_FOUND"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(payload)

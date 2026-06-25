@@ -52,7 +52,14 @@ export default function RecentUploads({ documents, onDelete, loading }: RecentUp
             </p>
           </div>
           <button
-            onClick={() => onDelete(doc.id)}
+            onClick={() => {
+              const ok = window.confirm(
+                `Delete "${doc.filename}"? This removes stored chunks and embeddings too.`
+              );
+              if (ok) {
+                onDelete(doc.id);
+              }
+            }}
             className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 shrink-0"
           >
             Delete

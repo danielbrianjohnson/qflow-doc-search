@@ -3,8 +3,10 @@
 import { ReactNode, useEffect, useState } from "react";
 import {
   ChunkContext,
+  DocumentContentResponse,
   SearchResult,
   fetchChunkContext,
+  fetchDocumentContent,
   formatDateTime,
 } from "@/lib/api";
 
@@ -14,26 +16,62 @@ interface ResultDetailModalProps {
   onClose: () => void;
 }
 
+const STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "by",
+  "for",
+  "from",
+  "in",
+  "is",
+  "it",
+  "of",
+  "on",
+  "or",
+  "that",
+  "the",
+  "to",
+  "was",
+  "were",
+  "with",
+]);
+
 function highlightText(text: string, query: string, highlight: boolean): ReactNode[] {
   if (!highlight) {
     return [text];
   }
 
-  const terms = query
+  const normalizedQuery = query.trim();
+  const phrase = normalizedQuery.length >= 4 ? normalizedQuery : "";
+
+  const terms = normalizedQuery
     .toLowerCase()
     .split(/\s+/)
     .map((t) => t.trim())
-    .filter((t) => t.length > 1);
+    .filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
 
-  if (terms.length === 0) {
+  if (!phrase && terms.length === 0) {
     return [text];
   }
 
-  const pattern = new RegExp(`(${terms.map(escapeRegex).join("|")})`, "gi");
+  const patternParts = [];
+  if (phrase) {
+    patternParts.push(escapeRegex(phrase));
+  }
+  patternParts.push(...terms.map(escapeRegex));
+  const pattern = new RegExp(`(${Array.from(new Set(patternParts)).join("|")})`, "gi");
   const parts = text.split(pattern);
 
   return parts.map((part, i) => {
-    const isMatch = terms.some((term) => part.toLowerCase() === term.toLowerCase());
+    const lower = part.toLowerCase();
+    const isPhraseMatch = phrase.length > 0 && lower === phrase.toLowerCase();
+    const isTermMatch = terms.some((term) => lower === term.toLowerCase());
+    const isMatch = isPhraseMatch || isTermMatch;
     if (isMatch) {
       return (
         <mark
@@ -56,11 +94,19 @@ export default function ResultDetailModal({ result, query, onClose }: ResultDeta
   const [context, setContext] = useState<ChunkContext | null>(null);
   const [loading, setLoading] = useState(false);
   const [contextError, setContextError] = useState<string | null>(null);
+  const bodyMaxHeightClass = "max-h-[calc(85vh-96px)]";
+  const [showFullDoc, setShowFullDoc] = useState(false);
+  const [fullDocLoading, setFullDocLoading] = useState(false);
+  const [fullDocError, setFullDocError] = useState<string | null>(null);
+  const [fullDoc, setFullDoc] = useState<DocumentContentResponse | null>(null);
 
   useEffect(() => {
     if (!result) {
       setContext(null);
       setContextError(null);
+      setShowFullDoc(false);
+      setFullDoc(null);
+      setFullDocError(null);
       return;
     }
 
@@ -105,10 +151,10 @@ export default function ResultDetailModal({ result, query, onClose }: ResultDeta
       aria-labelledby="result-modal-title"
     >
       <div
-        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl"
+        className="w-full max-w-2xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 px-5 py-4">
           <div className="min-w-0">
             <h3 id="result-modal-title" className="font-semibold truncate">
               {result.document.filename}
@@ -127,7 +173,36 @@ export default function ResultDetailModal({ result, query, onClose }: ResultDeta
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
+        <div className={`overflow-y-auto px-5 py-4 space-y-4 ${bodyMaxHeightClass}`}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              View surrounding chunks, or open full document text.
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                const next = !showFullDoc;
+                setShowFullDoc(next);
+                if (!next || fullDoc || fullDocLoading) return;
+                setFullDocLoading(true);
+                setFullDocError(null);
+                try {
+                  const payload = await fetchDocumentContent(result.document.id);
+                  setFullDoc(payload);
+                } catch (err) {
+                  setFullDocError(
+                    err instanceof Error ? err.message : "Could not load full document"
+                  );
+                } finally {
+                  setFullDocLoading(false);
+                }
+              }}
+              className="text-xs rounded-md border border-slate-300 dark:border-slate-700 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              {showFullDoc ? "Hide full document" : "View full document"}
+            </button>
+          </div>
+
           {loading && (
             <p className="text-sm text-slate-500">Loading surrounding context…</p>
           )}
@@ -153,6 +228,33 @@ export default function ResultDetailModal({ result, query, onClose }: ResultDeta
                 </div>
               </div>
             ))}
+
+          {showFullDoc && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">
+                Full document (text extraction)
+              </p>
+              {fullDocLoading && (
+                <p className="text-sm text-slate-500">Loading full document…</p>
+              )}
+              {fullDocError && (
+                <p className="text-sm text-amber-700 dark:text-amber-300">{fullDocError}</p>
+              )}
+              {!fullDocLoading && fullDoc && (
+                <>
+                  {fullDoc.truncated && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                      Showing first {fullDoc.max_chars.toLocaleString()} of{" "}
+                      {fullDoc.total_chars.toLocaleString()} characters.
+                    </p>
+                  )}
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {fullDoc.content}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

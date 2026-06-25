@@ -47,6 +47,18 @@ export interface ChunkContext {
   chunks: ContextChunk[];
 }
 
+export interface DocumentContentResponse {
+  document: {
+    id: number;
+    filename: string;
+    created_at: string;
+  };
+  content: string;
+  truncated: boolean;
+  max_chars: number;
+  total_chars: number;
+}
+
 export interface ApiError {
   error: string;
   code: string;
@@ -126,6 +138,20 @@ export async function fetchChunkContext(
     throw new Error(err.error || "Failed to load chunk context");
   }
   return data as ChunkContext;
+}
+
+export async function fetchDocumentContent(
+  documentId: number
+): Promise<DocumentContentResponse> {
+  const res = await fetch(`${API_URL}/api/documents/${documentId}/content/`, {
+    cache: "no-store",
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const err = data as ApiError;
+    throw new Error(err.error || "Failed to load document content");
+  }
+  return data as DocumentContentResponse;
 }
 
 export function formatFileSize(bytes: number): string {
