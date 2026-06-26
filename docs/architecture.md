@@ -47,7 +47,7 @@ sequenceDiagram
     UI->>API: POST /api/documents/
     API->>API: Validate, save to /app/uploads/
     API->>DB: Document(status=queued)
-    API->>Redis: Enqueue process_document
+    API->>Redis: Enqueue process_document_task
     API-->>UI: 202 Accepted
 
     Worker->>DB: status=processing

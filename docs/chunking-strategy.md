@@ -110,5 +110,5 @@ The `Document.chunk_count` field is set after processing and shown in the UI whe
 | Piece | Path |
 |-------|------|
 | Chunking logic | `backend/app/services/chunking.py` |
-| Called from worker | `backend/app/tasks.py` → `process_document` |
+| Called from worker | `backend/app/tasks.py` → `services/processing.py` |
 | Stored as | `DocumentChunk.text`, `token_count`, `embedding` |

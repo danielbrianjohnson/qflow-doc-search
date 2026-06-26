@@ -112,5 +112,5 @@ Viable for a job-centric API; we chose document-centric status on the `Document`
 |-----------|------|
 | Frontend polling | `frontend/src/app/page.tsx` |
 | Upload API | `backend/app/views.py` → `DocumentListCreateView` |
-| Background job | `backend/app/tasks.py` → `process_document` |
+| Background job | `backend/app/tasks.py` → `services/processing.py` |
 | Status model | `backend/app/models.py` → `Document.status` |

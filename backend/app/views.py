@@ -12,7 +12,7 @@ from app.services.chunks import get_chunk_context
 from app.services.documents import get_document_content
 from app.services.embeddings import get_embedding_service
 from app.services.search import search_chunks
-from app.tasks import process_document
+from app.tasks import process_document_task
 from app.throttling import SearchRateThrottle, UploadRateThrottle
 
 
@@ -81,7 +81,7 @@ class DocumentListCreateView(generics.ListCreateAPIView):
         documents = serializer.save()
 
         for document in documents:
-            process_document.delay(document.id)
+            process_document_task.delay(document.id)
 
         output = DocumentSerializer(documents, many=True)
         return Response({"documents": output.data}, status=status.HTTP_202_ACCEPTED)
